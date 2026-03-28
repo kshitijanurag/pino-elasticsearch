@@ -1,10 +1,10 @@
 'use strict'
 
+const { test } = require('node:test')
 const pino = require('pino')
 const proxyquire = require('proxyquire')
-const test = require('tap').test
-const fix = require('./fixtures')
 const EcsFormat = require('@elastic/ecs-pino-format')
+const fix = require('./fixtures')
 
 const matchISOString = /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
 const options = {
@@ -19,40 +19,51 @@ const dsOptions = {
 }
 
 test('make sure date format is valid', (t) => {
-  t.type(fix.datetime.object, 'string')
-  t.equal(fix.datetime.object, fix.datetime.string)
-  t.end()
+  t.assert.equal(typeof fix.datetime.object, 'string')
+  t.assert.equal(fix.datetime.object, fix.datetime.string)
 })
 
-test('make sure log is a valid json', (t) => {
+test('make sure log is a valid json', (t, done) => {
   t.plan(4)
+
   const Client = function (config) {
-    t.equal(config.node, options.node)
+    t.assert.equal(config.node, options.node)
   }
+
   Client.prototype.diagnostic = { on: () => {} }
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       for await (const chunk of opts.datasource) {
-        t.ok(chunk, true)
-        t.type(chunk.time, 'string')
-        t.match(chunk.time, matchISOString)
+        t.assert.ok(chunk)
+        t.assert.equal(typeof chunk.time, 'string')
+        t.assert.match(chunk.time, matchISOString)
       }
+
+      done()
     }
   }
+
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
   const instance = elastic(options)
   const log = pino(instance)
+
   const prettyLog = `some logs goes here.
   another log...`
   log.info(['info'], prettyLog)
+
+  setImmediate(() => instance.end())
 })
 
-test('date can be a number', (t) => {
+test('date can be a number', (t, done) => {
   t.plan(1)
-  const Client = function (config) {}
+
+  const Client = function (config) { }
+  
   Client.prototype.diagnostic = { on: () => {} }
+  Client.prototype.connectionPool = { resurrect: () => {} }
 
   const threeDaysInMillis = 3 * 24 * 60 * 60 * 1000
   const time = new Date(Date.now() - threeDaysInMillis)
@@ -60,8 +71,10 @@ test('date can be a number', (t) => {
   Client.prototype.helpers = {
     async bulk (opts) {
       for await (const chunk of opts.datasource) {
-        t.equal(chunk.time, time.toISOString())
+        t.assert.equal(chunk.time, time.toISOString())
       }
+
+      done()
     }
   }
 
@@ -70,145 +83,186 @@ test('date can be a number', (t) => {
   })
   const instance = elastic(options)
   const log = pino(instance)
-  log.info({
-    time: time.getTime()
-  })
+
+  log.info({ time: time.getTime() })
+
+  setImmediate(() => instance.end())
 })
 
-test('Uses the type parameter only with ES < 7 / 1', (t) => {
+test('Uses the type parameter only with ES < 7 / 1', (t, done) => {
   t.plan(2)
 
   const Client = function (config) {
-    t.equal(config.node, options.node)
+    t.assert.equal(config.node, options.node)
   }
-  Client.prototype.diagnostic = { on: () => {} }
 
+  Client.prototype.diagnostic = { on: () => {} }
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       for await (const chunk of opts.datasource) {
         const action = opts.onDocument(chunk)
-        t.equal(action.index._type, 'log')
+        
+        t.assert.equal(action.index._type, 'log')
       }
+
+      done()
     }
   }
 
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-  const instance = elastic(Object.assign(options, { esVersion: 6 }))
+  const instance = elastic(Object.assign({}, options, { esVersion: 6 }))
   const log = pino(instance)
+
   const prettyLog = `some logs goes here.
   another log...`
   log.info(['info'], prettyLog)
+
+  setImmediate(() => instance.end())
 })
 
-test('Uses the type parameter only with ES < 7 / 1, even with the deprecated `esVersion` option', (t) => {
+test('Uses the type parameter only with ES < 7 / 1, even with the deprecated `esVersion` option', (t, done) => {
   t.plan(2)
 
   const Client = function (config) {
-    t.equal(config.node, options.node)
+    t.assert.equal(config.node, options.node)
   }
-  Client.prototype.diagnostic = { on: () => {} }
 
+  Client.prototype.diagnostic = { on: () => {} }
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       for await (const chunk of opts.datasource) {
         const action = opts.onDocument(chunk)
-        t.equal(action.index._type, 'log')
+
+        t.assert.equal(action.index._type, 'log')
       }
+
+      done()
     }
   }
 
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-  const instance = elastic(Object.assign(options, { esVersion: 6 }))
+  const instance = elastic(Object.assign({}, options, { esVersion: 6 }))
   const log = pino(instance)
+
   const prettyLog = `some logs goes here.
   another log...`
   log.info(['info'], prettyLog)
+
+  setImmediate(() => instance.end())
 })
 
-test('Uses the type parameter only with ES < 7 / 2', (t) => {
+test('Uses the type parameter only with ES < 7 / 2', (t, done) => {
   t.plan(2)
 
   const Client = function (config) {
-    t.equal(config.node, options.node)
+    t.assert.equal(config.node, options.node)
   }
+
   Client.prototype.diagnostic = { on: () => {} }
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       for await (const chunk of opts.datasource) {
         const action = opts.onDocument(chunk)
-        t.equal(action.index._type, undefined)
+
+        t.assert.equal(action.index._type, undefined)
       }
+
+      done()
     }
   }
 
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-  const instance = elastic(Object.assign(options, { esVersion: 7 }))
+  const instance = elastic(Object.assign({}, options, { esVersion: 7 }))
   const log = pino(instance)
+
   const prettyLog = `some logs goes here.
   another log...`
   log.info(['info'], prettyLog)
+
+  setImmediate(() => instance.end())
 })
 
-test('Uses the type parameter only with ES < 7 / 2, even with the deprecate `esVersion` option', (t) => {
+test('Uses the type parameter only with ES < 7 / 2, even with the deprecate `esVersion` option', (t, done) => {
   t.plan(2)
+
   const Client = function (config) {
-    t.equal(config.node, options.node)
+    t.assert.equal(config.node, options.node)
   }
+
   Client.prototype.diagnostic = { on: () => {} }
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       for await (const chunk of opts.datasource) {
         const action = opts.onDocument(chunk)
-        t.equal(action.index._type, undefined)
+
+        t.assert.equal(action.index._type, undefined)
       }
+
+      done()
     }
   }
 
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-  const instance = elastic(Object.assign(options, { esVersion: 7 }))
+  const instance = elastic(Object.assign({}, options, { esVersion: 7 }))
   const log = pino(instance)
+
   const prettyLog = `some logs goes here.
   another log...`
   log.info(['info'], prettyLog)
+
+  setImmediate(() => instance.end())
 })
 
-test('ecs format', (t) => {
+test('ecs format', (t, done) => {
   t.plan(5)
+
+  const prettyLog = 'some logs goes here.\n  another log...'
   const Client = function (config) {
-    t.equal(config.node, options.node)
+    t.assert.equal(config.node, options.node)
   }
+
   Client.prototype.diagnostic = { on: () => {} }
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       for await (const chunk of opts.datasource) {
-        t.ok(chunk, true)
-        t.type(chunk['@timestamp'], 'string')
-        t.equal(chunk.message, prettyLog)
-        t.match(chunk['@timestamp'], matchISOString)
+        t.assert.ok(chunk)
+        t.assert.equal(typeof chunk['@timestamp'], 'string')
+        t.assert.equal(chunk.message, prettyLog)
+        t.assert.match(chunk['@timestamp'], matchISOString)
       }
+
+      done()
     }
   }
 
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-  const instance = elastic(Object.assign(options, { ecs: true }))
+  const instance = elastic(Object.assign({}, options, { ecs: true }))
   const ecsFormat = EcsFormat()
   const log = pino({ ...ecsFormat }, instance)
-  const prettyLog = `some logs goes here.
-  another log...`
+
   log.info(['info'], prettyLog)
+
+  setImmediate(() => instance.end())
 })
 
-test('auth and cloud parameters are properly passed to client', (t) => {
+test('auth and cloud parameters are properly passed to client', (t, done) => {
+  t.plan(3)
+
   const opts = {
     ...options,
     auth: {
@@ -220,23 +274,27 @@ test('auth and cloud parameters are properly passed to client', (t) => {
     }
   }
 
-  t.plan(3)
   const Client = function (config) {
-    t.equal(config.node, opts.node)
-    t.equal(config.auth, opts.auth)
-    t.equal(config.cloud, opts.cloud)
+    t.assert.equal(config.node, opts.node)
+    t.assert.equal(config.auth, opts.auth)
+    t.assert.equal(config.cloud, opts.cloud)
   }
+
   Client.prototype.diagnostic = { on: () => {} }
-  Client.prototype.helpers = {
-    async bulk (opts) {}
-  }
+  Client.prototype.connectionPool = { resurrect: () => {} }
+  Client.prototype.helpers = { async bulk() { } }
+  
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
   elastic(opts)
+
+  done()
 })
 
-test('apiKey is passed through auth param properly to client', (t) => {
+test('apiKey is passed through auth param properly to client', (t, done) => {
+  t.plan(2)
+
   const opts = {
     ...options,
     auth: {
@@ -244,186 +302,239 @@ test('apiKey is passed through auth param properly to client', (t) => {
     }
   }
 
-  t.plan(2)
   const Client = function (config) {
-    t.equal(config.node, opts.node)
-    t.equal(config.auth, opts.auth)
+    t.assert.equal(config.node, opts.node)
+    t.assert.equal(config.auth, opts.auth)
   }
+
   Client.prototype.diagnostic = { on: () => {} }
-  Client.prototype.helpers = {
-    async bulk (opts) {}
-  }
+  Client.prototype.connectionPool = { resurrect: () => {} }
+  Client.prototype.helpers = { async bulk() { } }
+  
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
   elastic(opts)
+
+  done()
 })
 
-test('make sure `flushInterval` is passed to bulk request', (t) => {
+test('make sure `flushInterval` is passed to bulk request', (t, done) => {
   t.plan(1)
 
-  const Client = function (config) {}
+  const Client = function (config) { }
+  
   Client.prototype.diagnostic = { on: () => {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
-      t.equal(opts.flushInterval, 12345)
+      t.assert.equal(opts.flushInterval, 12345)
+
+      done()
+
+      for await (const _ of opts.datasource) {}
     }
   }
+
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
-  options.flushInterval = 12345
-  const instance = elastic(options)
+  const instance = elastic({ ...options, flushInterval: 12345 })
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  setImmediate(() => instance.end())
 })
 
-test('make sure deprecated `flushInterval` is passed to bulk request', (t) => {
+test('make sure `flushInterval` is passed to bulk request', (t, done) => {
   t.plan(1)
 
   const flushInterval = 12345
-
-  const Client = function (config) {}
+  const Client = function (config) { }
+  
   Client.prototype.diagnostic = { on: () => {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
-      t.equal(opts.flushInterval, flushInterval)
+      t.assert.equal(opts.flushInterval, flushInterval)
+
+      done()
+
+      for await (const _ of opts.datasource) {}
     }
   }
+
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic({ ...options, flushInterval })
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  setImmediate(() => instance.end())
 })
 
-test('make sure `flushBytes` is passed to bulk request', (t) => {
+test('make sure `flushBytes` is passed to bulk request', (t, done) => {
   t.plan(1)
 
   const flushBytes = true
 
   const Client = function (config) {}
   Client.prototype.diagnostic = { on: () => {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
-      t.equal(opts.flushBytes, flushBytes)
+      t.assert.equal(opts.flushBytes, flushBytes)
+
+      done()
+
+      for await (const _ of opts.datasource) {}
     }
   }
+  
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic({ ...options, flushBytes })
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  setImmediate(() => instance.end())
 })
 
-test('make sure deprecated `flush-bytes` is passed to bulk request', (t) => {
+test('make sure deprecated `flush-bytes` is passed to bulk request', (t, done) => {
   t.plan(1)
 
   const flushBytes = true
 
-  const Client = function (config) {}
+  const Client = function (config) { }
+  
   Client.prototype.diagnostic = { on: () => {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
-      t.equal(opts.flushBytes, flushBytes)
+      t.assert.equal(opts.flushBytes, flushBytes)
+
+      done()
+
+      for await (const _ of opts.datasource) {}
     }
   }
+
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic({ ...options, 'flush-bytes': flushBytes })
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  setImmediate(() => instance.end())
 })
 
-test('make sure `opType` is passed to bulk onDocument request', (t) => {
+test('make sure `opType` is passed to bulk onDocument request', (t, done) => {
   t.plan(2)
 
-  const Client = function (config) {}
+  const Client = function (config) { }
+  
   Client.prototype.diagnostic = { on: () => {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       const result = opts.onDocument({})
-      t.equal(result.index._index, dsOptions.index, `_index should be correctly set to \`${dsOptions.index}\``)
-      t.equal(result.index.op_type, dsOptions.opType, `\`op_type\` should be set to \`${dsOptions.opType}\``)
-      t.end()
+
+      t.assert.equal(result.index._index, dsOptions.index, `_index should be correctly set to \`${dsOptions.index}\``)
+      t.assert.equal(result.index.op_type, dsOptions.opType, `\`op_type\` should be set to \`${dsOptions.opType}\``)
+
+      done()
+
+      for await (const _ of opts.datasource) {}
     }
   }
+
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic(dsOptions)
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  setImmediate(() => instance.end())
 })
 
-test('make sure deprecated `op_type` is passed to bulk onDocument request', (t) => {
+test('make sure deprecated `op_type` is passed to bulk onDocument request', (t, done) => {
   t.plan(2)
 
-  const Client = function (config) {}
+  const Client = function (config) { }
+  
   Client.prototype.diagnostic = { on: () => {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       const result = opts.onDocument({})
-      t.equal(result.index._index, dsOptions.index, `_index should be correctly set to \`${dsOptions.index}\``)
-      t.equal(result.index.op_type, dsOptions.opType, `\`op_type\` should be set to \`${dsOptions.opType}\``)
-      t.end()
+
+      t.assert.equal(result.index._index, dsOptions.index, `_index should be correctly set to \`${dsOptions.index}\``)
+      t.assert.equal(result.index.op_type, dsOptions.opType, `\`op_type\` should be set to \`${dsOptions.opType}\``)
+
+      done()
+
+      for await (const _ of opts.datasource) {}
     }
   }
+
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const { opType, ...rest } = dsOptions
-
   const instance = elastic({ ...rest, op_type: opType })
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  setImmediate(() => instance.end())
 })
 
-test('make sure `@timestamp` is correctly set when `opType` is `create`', (t) => {
+test('make sure `@timestamp` is correctly set when `opType` is `create`', (t, done) => {
   t.plan(1)
 
-  const document = {
-    time: '2021-09-01T01:01:01.038Z'
-  }
+  const document = { time: '2021-09-01T01:01:01.038Z' }
+
   const Client = function (config) {}
   Client.prototype.diagnostic = { on: () => {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
   Client.prototype.helpers = {
     async bulk (opts) {
       opts.onDocument(document)
-      t.equal(document['@timestamp'], '2021-09-01T01:01:01.038Z', 'Document @timestamp does not equal the provided timestamp')
-      t.end()
+
+      t.assert.equal(document['@timestamp'], '2021-09-01T01:01:01.038Z', 'Document @timestamp does not equal the provided timestamp')
+
+      done()
+
+      for await (const _ of opts.datasource) {}
     }
   }
+
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic(dsOptions)
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  setImmediate(() => instance.end())
 })
 
-test('resurrect client connection pool when datasource split is destroyed', (t) => {
+test('resurrect client connection pool when datasource split is destroyed', (t, done) => {
   let isResurrected = false
-  const Client = function (config) {}
-  Client.prototype.diagnostic = { on: () => {} }
 
+  const Client = function (config) { }
+  
+  Client.prototype.diagnostic = { on: () => {} }
   Client.prototype.helpers = {
     bulk: async function (opts) {
       if (!isResurrected) {
@@ -431,85 +542,92 @@ test('resurrect client connection pool when datasource split is destroyed', (t) 
       }
     }
   }
-
   Client.prototype.connectionPool = {
     resurrect: function () {
       isResurrected = true
-      t.end()
+
+      done()
     }
   }
 
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic({ ...options })
   const log = pino(instance)
 
-  const prettyLog = 'Example of a log'
-  log.info(['info'], prettyLog)
+  log.info(['info'], 'Example of a log')
 })
 
-test('make sure deprecated `rejectUnauthorized` is passed to client constructor', (t) => {
+test('make sure deprecated `rejectUnauthorized` is passed to client constructor', (t, done) => {
   t.plan(1)
 
   const rejectUnauthorized = true
 
   const Client = function (config) {
-    t.equal(config.tls.rejectUnauthorized, rejectUnauthorized)
+    t.assert.equal(config.tls.rejectUnauthorized, rejectUnauthorized)
   }
 
   Client.prototype.diagnostic = { on: () => {} }
-  Client.prototype.helpers = { async bulk () {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
+  Client.prototype.helpers = { async bulk() { } }
+  
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic({ ...options, rejectUnauthorized })
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  done()
 })
 
-test('make sure `tls.rejectUnauthorized` is passed to client constructor', (t) => {
+test('make sure `tls.rejectUnauthorized` is passed to client constructor', (t, done) => {
   t.plan(1)
 
   const tls = { rejectUnauthorized: true }
 
   const Client = function (config) {
-    t.equal(config.tls.rejectUnauthorized, tls.rejectUnauthorized)
+    t.assert.equal(config.tls.rejectUnauthorized, tls.rejectUnauthorized)
   }
 
   Client.prototype.diagnostic = { on: () => {} }
-  Client.prototype.helpers = { async bulk () {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
+  Client.prototype.helpers = { async bulk() { } }
+  
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic({ ...options, tls })
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  done()
 })
 
-test('make sure `tls.rejectUnauthorized` overrides deprecated `rejectUnauthorized`', (t) => {
+test('make sure `tls.rejectUnauthorized` overrides deprecated `rejectUnauthorized`', (t, done) => {
   t.plan(1)
 
   const rejectUnauthorized = true
   const tls = { rejectUnauthorized: false }
 
   const Client = function (config) {
-    t.equal(config.tls.rejectUnauthorized, tls.rejectUnauthorized)
+    t.assert.equal(config.tls.rejectUnauthorized, tls.rejectUnauthorized)
   }
 
   Client.prototype.diagnostic = { on: () => {} }
-  Client.prototype.helpers = { async bulk () {} }
-
+  Client.prototype.connectionPool = { resurrect: () => {} }
+  Client.prototype.helpers = { async bulk() { } }
+  
   const elastic = proxyquire('../', {
     '@elastic/elasticsearch': { Client }
   })
-
   const instance = elastic({ ...options, rejectUnauthorized, tls })
   const log = pino(instance)
+
   log.info(['info'], 'abc')
+
+  done()
 })
