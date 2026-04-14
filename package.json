@@ -9,7 +9,7 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "tsd && borp 'test/*.test.js'"
+    "test": "tsd && borp 'test/*.test.js' --timeout 60000 --coverage"
   },
   "keywords": [
     "pino",
